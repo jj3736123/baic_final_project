@@ -6,7 +6,8 @@ Air France 검색광고 데이터 전처리
 
 전처리 내용 (팀 확정 사항)
 1. Keyword가 'cont:'로 시작하는 48행 제외 (검색광고가 아닌 콘텐츠 네트워크 광고)
-2. 컬럼 삭제: Click Charges(Total Cost와 동일), Keyword Type(전부 같은 값)
+2. 컬럼 삭제: Click Charges(Total Cost와 동일), Keyword Type(전부 같은 값), Publisher ID(Publisher Name과 1:1),
+   Category(대행사 내부 태그, 64%가 uncategorized), Probability of Booking(클릭률×전환율로 계산된 값)
 3. 키워드 분류: 브랜드/비브랜드, 비브랜드 안에서 broad/focused, 검색 의도
 4. 매체: Publisher Name 7개 그대로, 회사 단위 참고 컬럼(engine) 추가
 5. 캠페인: Geo Targeted 13개를 하나로 통합, Unassigned는 '미지정'
@@ -35,7 +36,7 @@ df = df[~kw.str.startswith("cont:")].copy()
 df["kw"] = df["Keyword"].str.lower().str.strip()
 
 # ── 2. 불필요한 컬럼 삭제 ───────────────────────────────
-df = df.drop(columns=["Click Charges", "Keyword Type"])
+df = df.drop(columns=["Click Charges", "Keyword Type", "Publisher ID", "Category", "Probability of Booking"])
 
 # ── 3. 키워드 분류 ──────────────────────────────────────
 # 3-1. 브랜드 여부: air france / airfrance / 오타 airframce 포함
@@ -102,12 +103,11 @@ df["Bid Strategy"] = df["Bid Strategy"].map(BID_MAP).fillna("미설정")
 df["flag_cpc_100"] = df["Clicks"] >= 100
 df["flag_conv_370"] = (~df["brand"]) & (df["Clicks"] >= 370)
 
-df = df.drop(columns=["kw"])
+df = df.drop(columns=["kw", "brand"])
 
 # ── 저장 ────────────────────────────────────────────────
 DICT = pd.DataFrame([
-    ("brand", "브랜드 키워드 여부 (air france / airfrance / airframce 포함)"),
-    ("brand_label", "브랜드 / 비브랜드"),
+    ("brand_label", "브랜드 / 비브랜드 (air france / airfrance / airframce 포함 시 브랜드)"),
     ("scope", "비브랜드만: focused(국가·도시·공항명 포함) / broad"),
     ("intent", "비브랜드만: 항공권 / 여행 / 기타 / 무관(tour de france)"),
     ("engine", "회사 단위 매체 (Google / Yahoo / MSN, Overture는 Yahoo에 포함). 참고용"),
@@ -123,7 +123,7 @@ with pd.ExcelWriter(OUT) as w:
     DICT.to_excel(w, sheet_name="컬럼설명", index=False)
 
 print(f"원본 {n_raw}행 → 전처리 후 {len(df)}행, {df.shape[1]}컬럼 → {OUT.relative_to(ROOT)}")
-print(df["brand_label"].value_counts().to_dict())
+print(df["brand_label"].value_counts().to_dict()); print(list(df.columns))
 print(df["scope"].value_counts().to_dict(), df["intent"].value_counts().to_dict())
 print(df["campaign_group"].nunique(), "캠페인 그룹 |", df["Bid Strategy"].value_counts().to_dict())
 print("flag_cpc_100", int(df.flag_cpc_100.sum()), "| flag_conv_370", int(df.flag_conv_370.sum()))
