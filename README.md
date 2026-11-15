@@ -49,7 +49,7 @@ python src/eda_basic.py    # outputs/eda_basic_results.xlsx 생성
 | 매체 | Publisher Name 7개 유지, 참고용 engine 컬럼 추가 |
 | 캠페인 | campaign_group: Geo Targeted 13개 통합, Unassigned는 미지정 |
 | Bid Strategy | 표기 통일, 결측은 미설정 |
-| 이상치 | 삭제 없음. flag_cpc_100, flag_conv_370 표시 ([최소 클릭 기준](docs/min_click_threshold.md)) |
+| 이상치 | 삭제 없음. flag_brand_cpc_100, flag_conv_370 표시 ([최소 클릭 기준](docs/min_click_threshold.md)) |
 
 ## 지표 정의
 

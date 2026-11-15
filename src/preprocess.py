@@ -13,7 +13,7 @@ Air France 검색광고 데이터 전처리
 5. 캠페인: Geo Targeted 13개를 하나로 통합, Unassigned는 '미지정'
 6. Bid Strategy: 표기 통일, 결측은 '미설정'
 7. 이상치: 행 삭제 없음. 키워드 단위 판단 대상 표시 컬럼 추가
-   - flag_cpc_100 : 클릭 100회 이상 (클릭당 비용 비교용, 브랜드·비브랜드)
+   - flag_brand_cpc_100: 브랜드이면서 클릭 100회 이상 (브랜드 KPI인 클릭당 비용 비교용)
    - flag_conv_370: 비브랜드이면서 클릭 370회 이상 (전환율·ROA 비교, 예약 0건 판단용)
 """
 import re
@@ -100,7 +100,7 @@ BID_MAP = {
 df["Bid Strategy"] = df["Bid Strategy"].map(BID_MAP).fillna("미설정")
 
 # ── 7. 최소 클릭 기준 표시 ──────────────────────────────
-df["flag_cpc_100"] = df["Clicks"] >= 100
+df["flag_brand_cpc_100"] = df["brand"] & (df["Clicks"] >= 100)
 df["flag_conv_370"] = (~df["brand"]) & (df["Clicks"] >= 370)
 
 df = df.drop(columns=["kw", "brand"])
@@ -113,8 +113,8 @@ DICT = pd.DataFrame([
     ("engine", "회사 단위 매체 (Google / Yahoo / MSN, Overture는 Yahoo에 포함). 참고용"),
     ("campaign_group", "Campaign 정리본: Geo Targeted 13개 통합, Unassigned는 미지정"),
     ("Bid Strategy", "표기 통일, 결측은 미설정"),
-    ("flag_cpc_100", "클릭 100회 이상. 클릭당 비용을 키워드 단위로 비교할 때 이 행만 사용"),
-    ("flag_conv_370", "비브랜드이면서 클릭 370회 이상. 전환율·ROA 비교와 예약 0건 판단을 키워드 단위로 할 때 이 행만 사용"),
+    ("flag_brand_cpc_100", "브랜드이면서 클릭 100회 이상. 브랜드 키워드의 클릭당 비용을 키워드 단위로 비교할 때 이 행만 사용"),
+    ("flag_conv_370", "비브랜드이면서 클릭 370회 이상. 전환율·ROA 비교와 예약 0건 판단을 키워드 단위로 할 때 이 행만 사용. 클릭당 비용은 이 행 안에서 ROA 원인 분해용으로만 봄"),
     ("(집계 원칙)", "여러 행을 묶어 지표를 낼 때는 행별 비율을 평균내지 말고 원천 수치(매출·광고비·클릭·예약)를 합산한 뒤 다시 계산"),
 ], columns=["컬럼", "설명"])
 
@@ -126,4 +126,4 @@ print(f"원본 {n_raw}행 → 전처리 후 {len(df)}행, {df.shape[1]}컬럼 �
 print(df["brand_label"].value_counts().to_dict()); print(list(df.columns))
 print(df["scope"].value_counts().to_dict(), df["intent"].value_counts().to_dict())
 print(df["campaign_group"].nunique(), "캠페인 그룹 |", df["Bid Strategy"].value_counts().to_dict())
-print("flag_cpc_100", int(df.flag_cpc_100.sum()), "| flag_conv_370", int(df.flag_conv_370.sum()))
+print("flag_brand_cpc_100", int(df.flag_brand_cpc_100.sum()), "| flag_conv_370", int(df.flag_conv_370.sum()))
