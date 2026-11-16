@@ -37,12 +37,10 @@ nb = df[df["brand_label"] == "비브랜드"]
 results = {
     "1_전체": summarize(df.assign(all="전체"), "all"),
     "2_매체별": summarize(df, "Publisher Name"),
-    "3_검색엔진별": summarize(df, "engine"),
     "4_브랜드여부": summarize(df, "brand_label"),
     "5_매체x브랜드": summarize(df, ["Publisher Name", "brand_label"]),
     "6_broad_focused": summarize(nb, "scope"),
     "7_검색의도": summarize(nb, "intent"),
-    "8_캠페인별": summarize(df, "campaign_group"),
     "9_예약0건": summarize(df.assign(zero=df["Bookings"] == 0), "zero"),
 }
 

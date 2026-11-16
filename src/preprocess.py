@@ -3,17 +3,17 @@ Air France 검색광고 데이터 전처리
 
 입력: data/AirFrance Search data.xlsx 의 숨김 시트 'DoubleClick Data' (4,510행)
 출력: data/airfrance_preprocessed.xlsx  (시트: data, 컬럼설명)
+※ 원본 엑셀의 Keyword ID는 숫자로 저장돼 끝 두 자리가 손실돼 있다. 레포의 전처리 파일은 원본 텍스트 ID로 별도 복구한 버전이다(시트 ID_복구검증).
+  이 스크립트를 다시 돌리면 Keyword ID가 손실된 상태로 덮어쓰므로 주의.
 
 전처리 내용 (팀 확정 사항)
 1. Keyword가 'cont:'로 시작하는 48행 제외 (검색광고가 아닌 콘텐츠 네트워크 광고)
 2. 컬럼 삭제: Click Charges(Total Cost와 동일), Keyword Type(전부 같은 값), Publisher ID(Publisher Name과 1:1),
    Category(대행사 내부 태그, 64%가 uncategorized), Probability of Booking(클릭률×전환율로 계산된 값)
 3. 키워드 분류: 브랜드/비브랜드, 비브랜드 안에서 broad/focused, 검색 의도
-4. 매체: Publisher Name 7개 그대로, 회사 단위 참고 컬럼(engine) 추가
-5. 캠페인: Geo Targeted 13개를 하나로 통합, Unassigned는 '미지정'
-6. Bid Strategy: 표기 통일, 결측은 '미설정'
-7. 이상치: 행 삭제 없음. 키워드 단위 판단 대상 표시 컬럼 추가
-   - flag_brand_cpc_100: 브랜드이면서 클릭 100회 이상 (브랜드 KPI인 클릭당 비용 비교용)
+4. Bid Strategy: 표기 통일, 결측은 '미설정'
+5. 이상치: 행 삭제 없음. 키워드 단위 판단 대상 표시 컬럼 추가
+   - flag_cpc_100: 클릭 100회 이상 (클릭당 비용을 키워드 단위로 비교할 때 사용)
    - flag_conv_370: 비브랜드이면서 클릭 370회 이상 (전환율·ROA·Net Revenue 비교, 예약 0건 판단용)
 """
 import re
@@ -78,15 +78,7 @@ nb = ~df["brand"]
 df.loc[nb, "scope"] = df.loc[nb, "kw"].apply(scope)
 df.loc[nb, "intent"] = df.loc[nb, "kw"].apply(intent)
 
-# ── 4. 매체: 회사 단위 참고 컬럼 ─────────────────────────
-df["engine"] = df["Publisher Name"].str.split(" - ").str[0].replace({"Overture": "Yahoo"})
-
-# ── 5. 캠페인 정리 ──────────────────────────────────────
-df["campaign_group"] = df["Campaign"]
-df.loc[df["Campaign"].str.startswith("Geo Targeted"), "campaign_group"] = "Geo Targeted"
-df.loc[df["Campaign"] == "Unassigned", "campaign_group"] = "미지정"
-
-# ── 6. Bid Strategy 표기 통일 ───────────────────────────
+# ── 4. Bid Strategy 표기 통일 ───────────────────────────
 BID_MAP = {
     "Position 5-10 Bid Strategy": "Position 5-10",
     "Position 2-5 Bid Strategy": "Position 2-5",
@@ -99,8 +91,8 @@ BID_MAP = {
 }
 df["Bid Strategy"] = df["Bid Strategy"].map(BID_MAP).fillna("미설정")
 
-# ── 7. 최소 클릭 기준 표시 ──────────────────────────────
-df["flag_brand_cpc_100"] = df["brand"] & (df["Clicks"] >= 100)
+# ── 5. 최소 클릭 기준 표시 ──────────────────────────────
+df["flag_cpc_100"] = df["Clicks"] >= 100
 df["flag_conv_370"] = (~df["brand"]) & (df["Clicks"] >= 370)
 
 df = df.drop(columns=["kw", "brand"])
@@ -110,10 +102,8 @@ DICT = pd.DataFrame([
     ("brand_label", "브랜드 / 비브랜드 (air france / airfrance / airframce 포함 시 브랜드)"),
     ("scope", "비브랜드만: focused(국가·도시·공항명 포함) / broad"),
     ("intent", "비브랜드만: 항공권 / 여행 / 기타 / 무관(tour de france)"),
-    ("engine", "회사 단위 매체 (Google / Yahoo / MSN, Overture는 Yahoo에 포함). 참고용"),
-    ("campaign_group", "Campaign 정리본: Geo Targeted 13개 통합, Unassigned는 미지정"),
     ("Bid Strategy", "표기 통일, 결측은 미설정"),
-    ("flag_brand_cpc_100", "브랜드이면서 클릭 100회 이상. 브랜드 키워드의 클릭당 비용을 키워드 단위로 비교할 때 이 행만 사용"),
+    ("flag_cpc_100", "클릭 100회 이상. 클릭당 비용을 키워드 단위로 비교할 때 이 행만 사용"),
     ("flag_conv_370", "비브랜드이면서 클릭 370회 이상. 전환율·ROA·Net Revenue 비교와 예약 0건 판단을 키워드 단위로 할 때 이 행만 사용. 클릭당 비용은 이 행 안에서 ROA 원인 분해용으로만 봄"),
     ("(집계 원칙)", "여러 행을 묶어 지표를 낼 때는 행별 비율을 평균내지 말고 원천 수치(매출·광고비·클릭·예약)를 합산한 뒤 다시 계산"),
 ], columns=["컬럼", "설명"])
@@ -125,5 +115,5 @@ with pd.ExcelWriter(OUT) as w:
 print(f"원본 {n_raw}행 → 전처리 후 {len(df)}행, {df.shape[1]}컬럼 → {OUT.relative_to(ROOT)}")
 print(df["brand_label"].value_counts().to_dict()); print(list(df.columns))
 print(df["scope"].value_counts().to_dict(), df["intent"].value_counts().to_dict())
-print(df["campaign_group"].nunique(), "캠페인 그룹 |", df["Bid Strategy"].value_counts().to_dict())
-print("flag_brand_cpc_100", int(df.flag_brand_cpc_100.sum()), "| flag_conv_370", int(df.flag_conv_370.sum()))
+print(df["Bid Strategy"].value_counts().to_dict())
+print("flag_cpc_100", int(df.flag_cpc_100.sum()), "| flag_conv_370", int(df.flag_conv_370.sum()))
